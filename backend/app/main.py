@@ -10,6 +10,7 @@ from app.api.routes.repositories import router as repository_router
 from app.risk.route_change_coupling import (
     router as change_coupling_router,
 )
+from app.rag.route_rag import router as rag_router
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +47,7 @@ app.add_middleware(
 app.include_router(repository_router)
 app.include_router(graph_router)
 app.include_router(change_coupling_router)
+app.include_router(rag_router)
 
 @app.get("/")
 async def root():
