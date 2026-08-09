@@ -320,8 +320,24 @@ Important requirements:
 - Only return node IDs that appear in the supplied Methods.
 - Preserve node IDs exactly.
 - Do not invent code behavior.
-- The intent should describe why the commit appears to have been made,
-  not merely repeat the commit message.
+INTENT EVIDENCE POLICY:
+
+- Treat the commit message as the primary evidence of the author's
+  explicitly stated intent.
+- Use the Git diff and modified files to support and enrich that intent.
+- Never produce an intent that directly contradicts an explicit
+  statement in the commit message.
+- If the commit message explicitly says a feature is absent, do not
+  describe the commit as implementing that feature.
+- If the commit message explicitly says a feature was removed, do not
+  describe the commit as introducing that feature.
+- If the commit message is vague, use the diff and repository context
+  to infer the most defensible intent.
+- If the message and diff appear contradictory, preserve the explicit
+  message claim and express uncertainty rather than inventing a reason.
+- Do not invent unsupported motivations or architectural decisions.
+- The intent may semantically enrich the commit message, but must not
+  rewrite its meaning.
 - Keep the intent concise.
 - Keep Method summaries concise, preferably one sentence.
 - Do not include markdown.
@@ -372,10 +388,22 @@ code-intelligence system.
 Determine the primary intent of this commit.
 
 Requirements:
-- Describe why the change appears to have been made.
-- Use the commit message, modified files, and Git diff as evidence.
-- Do not merely repeat the commit message.
-- Do not invent unsupported motivations.
+INTENT EVIDENCE POLICY:
+
+- Treat the commit message as the primary evidence of the author's
+  explicitly stated intent.
+- Use modified files and Git diff as supporting evidence.
+- Never produce an intent that contradicts an explicit statement
+  in the commit message.
+- If the message explicitly states that a feature is absent,
+  do not describe the commit as implementing that feature.
+- If the message is vague, use the diff and modified files to infer
+  the most defensible intent.
+- If the message and diff appear contradictory, preserve the explicit
+  message claim and express uncertainty rather than inventing a reason.
+- Do not invent unsupported motivations, requirements, or architecture.
+- The intent may enrich the message semantically, but must not
+  rewrite its meaning.
 - Keep the intent concise, preferably one sentence.
 - Do not include markdown.
 
@@ -490,15 +518,64 @@ code-intelligence system.
 
 Determine the primary intent of every commit provided.
 
-Requirements:
-- Preserve each commit_hash exactly.
-- Return exactly one intent for every commit.
-- Describe why the change appears to have been made.
-- Use the commit message, modified files, and diff as evidence.
-- Do not merely repeat the commit message.
-- Do not invent unsupported motivations.
-- Keep each intent concise, preferably one sentence.
-- Do not include markdown.
+EVIDENCE POLICY:
+
+1. The commit message is the PRIMARY evidence of the author's
+   explicitly stated intent.
+
+2. The modified files and Git diff are SECONDARY evidence used to
+   support, clarify, and enrich that intent.
+
+3. Never produce an intent that directly contradicts an explicit
+   statement in the commit message.
+
+4. If the commit message explicitly states that a feature is absent,
+   do NOT describe the commit as implementing that feature.
+
+5. If the commit message explicitly states that a feature was removed,
+   do NOT describe the commit as introducing that feature.
+
+6. If the commit message explicitly states that a feature was fixed,
+   updated, refactored, documented, or tested, preserve that meaning
+   in the generated intent.
+
+7. If the commit message is vague, use the modified files and Git diff
+   to infer the most defensible intent.
+
+8. If the commit message and diff appear contradictory, do NOT invent
+   a reason to reconcile them. Preserve the explicit statement from
+   the commit message and express the uncertainty conservatively.
+
+9. Do not invent motivations, requirements, architectural decisions,
+   or business goals that are not supported by the supplied evidence.
+
+10. The generated intent should be a semantic explanation of the
+    supported purpose of the commit. It may enrich the commit message,
+    but it must not rewrite its meaning.
+
+11. Preserve each commit_hash exactly.
+
+12. Return exactly one intent for every supplied commit.
+
+13. Keep each intent concise, preferably one sentence.
+
+14. Do not include markdown.
+
+IMPORTANT EXAMPLE:
+
+Commit message:
+"Version 1: Basic Functionalities of the Blog platform
+without any authentication and authorization"
+
+Correct intent:
+"Establish the initial Blog platform functionality without
+authentication or authorization."
+
+Incorrect intent:
+"Implement JWT authentication and role-based access control."
+
+The second interpretation is invalid because it contradicts the
+explicit commit message.
 
 Return only valid JSON in exactly this structure:
 
@@ -506,7 +583,7 @@ Return only valid JSON in exactly this structure:
   "commits": [
     {{
       "commit_hash": "exact commit hash",
-      "intent": "concise intent"
+      "intent": "evidence-grounded concise intent"
     }}
   ]
 }}
