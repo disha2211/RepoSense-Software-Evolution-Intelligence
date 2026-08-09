@@ -65,30 +65,43 @@ class Neo4jClient:
         return self.driver.session()
 
     def execute_query(
-        self,
-        query: str,
-        parameters: dict[str, Any] | None = None,
-    ) -> list[dict[str, Any]]:
-        """
-        Executes a Cypher query.
+    self,
+    query: str,
+    parameters: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
+            """
+            Executes a Cypher query and ensures the result is fully consumed.
 
-        Args:
-            query: Cypher query string.
-            parameters: Query parameters.
+            Args:
+                query: Cypher query string.
+                parameters: Query parameters.
 
-        Returns:
-            List of query results as dictionaries.
+            Returns:
+                List of query results as dictionaries.
 
-        Raises:
-            Neo4jError: If query execution fails.
-        """
-        try:
-            with self.get_session() as session:
-                result = session.run(query, parameters or {})
-                return [record.data() for record in result]
+            Raises:
+                Neo4jError: If query execution fails.
+            """
+            try:
+                with self.get_session() as session:
+                    result = session.run(
+                        query,
+                        parameters or {},
+                    )
 
-        except Neo4jError as e:
-            raise e
+                    records = [
+                        record.data()
+                        for record in result
+                    ]
+
+                    # Explicitly consume the result so that
+                    # write transactions are completed.
+                    result.consume()
+
+                    return records
+
+            except Neo4jError as e:
+                raise e
 
     def is_connected(self) -> bool:
         try:
