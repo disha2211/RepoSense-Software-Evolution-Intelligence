@@ -1,167 +1,81 @@
 import { useState } from 'react';
-import { Sparkles, Send, X, Bot } from 'lucide-react';
+import { Sparkles, Send, X, Bot, Loader2 } from 'lucide-react';
+
+import { askRepoSense } from '../services/backendApi';
+
+interface ChatMessage {
+  sender: 'ai' | 'user';
+  text: string;
+  sources?: string[];
+  confidence?: string;
+}
 
 export const RepoChatDrawer = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState('');
-  const [messages, setMessages] = useState([
+  const [isLoading, setIsLoading] = useState(false);
+
+  const [messages, setMessages] = useState<ChatMessage[]>([
     {
       sender: 'ai',
-      text: 'Hello! I am RepoSense GraphRAG Assistant. Ask me anything about repository evolution, developer intent, or risk impact.',
+      text:
+        'Hello! I am RepoSense GraphRAG Assistant. Ask me anything about this repository.',
     },
   ]);
 
   const presetQuestions = [
-    'Why was Redis introduced?',
-    'Which modules depend on jwt_verifier.py?',
-    'Who owns the Auth module?',
-    'What changed in PR #104?',
+    'How does authentication work?',
+    'Which classes are related to authentication?',
+    'What changed in the authentication architecture?',
+    'Which modules depend on SecurityConfig?',
   ];
 
+  const handleSend = async (textToSend?: string) => {
+    const query = (textToSend ?? input).trim();
 
-  const mockQuestionAnswers = [
-    {
-      question: "Why was Redis introduced?",
-      answer:
-        "Redis was introduced to cache authentication sessions and frequently accessed user data. This reduced repeated database queries and improved response latency during peak traffic.",
-    },
-    {
-      question: "Which modules depend on jwt_verifier.py?",
-      answer:
-        "The Auth module, Session Service, API Gateway, and Token Refresh Service directly depend on jwt_verifier.py.",
-    },
-    {
-      question: "Who owns the Auth module?",
-      answer:
-        "Based on commit history and pull requests, Alex Rivera is the primary contributor and maintainer of the Auth module.",
-    },
-    {
-      question: "What changed in PR #104?",
-      answer:
-        "PR #104 refactored jwt_verifier.py to eliminate a race condition during concurrent authentication requests and added additional unit tests.",
-    },
-    {
-      question: "Explain the authentication flow.",
-      answer:
-        "Incoming requests reach the API Gateway, which invokes jwt_verifier.py. Valid tokens are forwarded to the Auth Service, where user roles and permissions are validated before the request reaches downstream services.",
-    },
-    {
-      question: "Which classes are related to authentication?",
-      answer:
-        "AuthService, JwtVerifier, TokenProvider, UserRepository, SessionManager, and AuthenticationController participate in the authentication workflow.",
-    },
-    {
-      question: "Which files changed the most?",
-      answer:
-        "jwt_verifier.py, auth_service.py, session_manager.py, and token_provider.py have the highest number of commits in the repository.",
-    },
-    {
-      question: "Which developer contributed the most?",
-      answer:
-        "Risspecct contributed the largest number of commits, followed by Shresth-Agarwal and disha2211.",
-    },
-    {
-      question: "Which files are most risky?",
-      answer:
-        "jwt_verifier.py and auth_service.py have the highest change frequency and dependency count, making them the highest-risk files.",
-    },
-    {
-      question: "What is the dependency chain of Auth?",
-      answer:
-        "AuthenticationController → AuthService → JwtVerifier → UserRepository → RedisCache.",
-    },
-    {
-      question: "What happens during login?",
-      answer:
-        "Credentials are validated, a JWT is generated, the session is cached in Redis, and the access token is returned to the client.",
-    },
-    {
-      question: "How is JWT validated?",
-      answer:
-        "JwtVerifier validates the token signature, expiration time, issuer, and user claims before allowing the request to continue.",
-    },
-    {
-      question: "Which module imports SessionManager?",
-      answer:
-        "AuthService, LoginController, RefreshTokenService, and SessionCleanupJob import SessionManager.",
-    },
-    {
-      question: "Show the impact of modifying JwtVerifier.",
-      answer:
-        "Changing JwtVerifier affects authentication, authorization, session validation, API Gateway routing, and token refresh workflows.",
-    },
-    {
-      question: "Summarize the repository.",
-      answer:
-        "This repository implements a JWT-based authentication platform using Redis for session caching. The architecture is modular, with dedicated services for authentication, session management, and token generation.",
-    },
-    {
-      question: "What does AuthService do?",
-      answer:
-        "AuthService authenticates users, validates credentials, generates JWT tokens, and coordinates session creation.",
-    },
-    {
-      question: "Which tests cover authentication?",
-      answer:
-        "AuthServiceTest, JwtVerifierTest, AuthenticationControllerTest, and SessionManagerTest cover the authentication subsystem.",
-    },
-    {
-      question: "Explain repository architecture.",
-      answer:
-        "The repository follows a layered architecture consisting of Controllers, Services, Repositories, Utility Classes, and Infrastructure components.",
-    },
-    {
-      question: "How is Redis used?",
-      answer:
-        "Redis stores active sessions, refresh tokens, authentication metadata, and frequently accessed user information to reduce database load.",
-    },
-    {
-      question: "How does RepoSense answer questions?",
-      answer:
-        "RepoSense performs semantic retrieval, expands repository relationships through the graph, builds repository context, and then generates grounded answers using an LLM.",
-    },
-  ];
-
-  const normalizeQuestion = (value: string) =>
-    value.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim();
-
-  const getMockAnswer = (query: string) => {
-    const normalizedQuery = normalizeQuestion(query);
-
-    const directMatch = mockQuestionAnswers.find(({ question }) => normalizeQuestion(question) === normalizedQuery);
-    if (directMatch) {
-      return directMatch.answer;
+    if (!query || isLoading) {
+      return;
     }
 
-    const keywordMatch = mockQuestionAnswers.find(({ question }) => {
-      const normalizedQuestion = normalizeQuestion(question);
-      return normalizedQuery.includes(normalizedQuestion) || normalizedQuestion.includes(normalizedQuery);
-    });
+    setMessages((prev) => [
+      ...prev,
+      {
+        sender: 'user',
+        text: query,
+      },
+    ]);
 
-    if (keywordMatch) {
-      return keywordMatch.answer;
-    }
+    setInput('');
+    setIsLoading(true);
 
-    return 'I do not have a answer for that question yet. Try one of the suggested prompts to see the canned responses.';
-  };
+    try {
+      const result = await askRepoSense(query, 3);
 
-  const handleSend = (textToSend?: string) => {
-    const query = textToSend || input;
-    if (!query.trim()) return;
-
-    setMessages((prev) => [...prev, { sender: 'user', text: query }]);
-    if (!textToSend) setInput('');
-
-    setTimeout(() => {
-      const mockAnswer = getMockAnswer(query);
       setMessages((prev) => [
         ...prev,
         {
           sender: 'ai',
-          text: `[RepoSense Answer]\n\n${mockAnswer}`,
+          text: result.answer,
+          confidence: result.confidence,
+          sources: result.sources,
         },
       ]);
-    }, 800);
+    } catch (error) {
+      console.error('GraphRAG request failed:', error);
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          sender: 'ai',
+          text:
+            error instanceof Error
+              ? error.message
+              : 'Failed to get an answer from RepoSense.',
+        },
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -178,63 +92,146 @@ export const RepoChatDrawer = () => {
 
       {isOpen && (
         <div className="fixed bottom-6 right-6 w-96 h-[500px] bg-slate-900/95 backdrop-blur-2xl border border-slate-700/80 rounded-2xl shadow-2xl flex flex-col z-50 overflow-hidden">
+
+          {/* Header */}
           <div className="p-4 bg-slate-800/80 border-b border-slate-700/80 flex justify-between items-center">
             <div className="flex items-center gap-2">
               <Sparkles className="w-5 h-5 text-cyan-400" />
-              <span className="font-bold text-sm text-slate-100">Repository GraphRAG Chat</span>
+              <span className="font-bold text-sm text-slate-100">
+                Repository GraphRAG Chat
+              </span>
             </div>
-            <button onClick={() => setIsOpen(false)} className="p-1 hover:bg-slate-700 rounded-lg cursor-pointer">
+
+            <button
+              onClick={() => setIsOpen(false)}
+              className="p-1 hover:bg-slate-700 rounded-lg cursor-pointer"
+            >
               <X className="w-5 h-5 text-slate-400" />
             </button>
           </div>
 
-          <div className="flex-1 p-4 overflow-y-auto space-y-3">
-            {messages.map((m, idx) => (
+          {/* Messages */}
+          <div className="flex-1 p-4 overflow-y-auto overflow-x-hidden space-y-3">
+
+            {messages.map((message, index) => (
               <div
-                key={idx}
-                className={`flex gap-2 ${m.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+                key={index}
+                className={`flex gap-2 ${
+                  message.sender === 'user'
+                    ? 'justify-end'
+                    : 'justify-start'
+                }`}
               >
-                {m.sender === 'ai' && <Bot className="w-5 h-5 text-cyan-400 shrink-0 mt-1" />}
+
+                {message.sender === 'ai' && (
+                  <Bot className="w-5 h-5 text-cyan-400 shrink-0 mt-1" />
+                )}
+
                 <div
-                  className={`p-3 rounded-xl text-xs leading-relaxed max-w-[80%] whitespace-pre-line ${
-                    m.sender === 'user'
+                  className={`p-3 rounded-xl text-xs leading-relaxed max-w-[85%] whitespace-pre-wrap break-words ${
+                    message.sender === 'user'
                       ? 'bg-purple-600 text-white rounded-br-none'
                       : 'bg-slate-800 border border-slate-700 text-slate-200 rounded-bl-none'
                   }`}
                 >
-                  {m.text}
+                  {message.text}
+
+                  {/* Confidence */}
+                  {message.sender === 'ai' &&
+                    message.confidence && (
+                      <div className="mt-2 pt-2 border-t border-slate-700 text-[9px] text-cyan-300 uppercase">
+                        Confidence: {message.confidence}
+                      </div>
+                    )}
+
+                  {/* Sources */}
+                  {message.sender === 'ai' &&
+                    message.sources &&
+                    message.sources.length > 0 && (
+                      <div className="mt-2 pt-2 border-t border-slate-700">
+                        <div className="text-[9px] uppercase font-bold text-slate-400 mb-1">
+                          Sources
+                        </div>
+
+                        <div className="space-y-1">
+                          {message.sources.map(
+                            (source, sourceIndex) => (
+                              <div
+                                key={sourceIndex}
+                                className="text-[9px] text-cyan-300 break-all"
+                              >
+                                {source}
+                              </div>
+                            ),
+                          )}
+                        </div>
+                      </div>
+                    )}
                 </div>
               </div>
             ))}
+
+            {/* Loading */}
+            {isLoading && (
+              <div className="flex gap-2 justify-start">
+                <Bot className="w-5 h-5 text-cyan-400 shrink-0 mt-1" />
+
+                <div className="p-3 rounded-xl rounded-bl-none bg-slate-800 border border-slate-700 text-slate-300">
+                  <div className="flex items-center gap-2 text-xs">
+                    <Loader2 className="w-4 h-4 animate-spin text-cyan-400" />
+                    <span>
+                      Searching repository knowledge...
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
           </div>
 
-          <div className="p-2 border-t border-slate-800 bg-slate-950/50 flex gap-2 overflow-x-auto">
-            {presetQuestions.map((q, idx) => (
+          {/* Preset questions */}
+          <div className="p-2 border-t border-slate-800 bg-slate-950/50 flex gap-2 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+            {presetQuestions.map((question, index) => (
               <button
-                key={idx}
-                onClick={() => handleSend(q)}
-                className="whitespace-nowrap px-2.5 py-1 text-[10px] bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-cyan-300 rounded-full transition cursor-pointer"
+                key={index}
+                onClick={() => handleSend(question)}
+                disabled={isLoading}
+                className="whitespace-nowrap px-2.5 py-1 text-[10px] bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-cyan-300 rounded-full transition cursor-pointer disabled:opacity-50"
               >
-                {q}
+                {question}
               </button>
             ))}
           </div>
 
+          {/* Input */}
           <div className="p-3 border-t border-slate-800 flex items-center gap-2 bg-slate-900">
+
             <input
               type="text"
               value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+              onChange={(event) => setInput(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  handleSend();
+                }
+              }}
+              disabled={isLoading}
               placeholder="Ask a natural language question..."
-              className="flex-1 bg-slate-800 border border-slate-700 text-xs rounded-xl px-3 py-2 text-slate-100 focus:outline-none focus:border-cyan-500"
+              className="flex-1 bg-slate-800 border border-slate-700 text-slate-200 text-xs rounded-lg px-3 py-2 outline-none focus:border-cyan-500 disabled:opacity-50"
             />
+
             <button
               onClick={() => handleSend()}
-              className="p-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold rounded-xl transition cursor-pointer"
+              disabled={isLoading || !input.trim()}
+              className="p-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              <Send className="w-4 h-4" />
+              {isLoading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Send className="w-4 h-4" />
+              )}
             </button>
+
           </div>
         </div>
       )}

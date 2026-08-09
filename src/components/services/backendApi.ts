@@ -327,3 +327,35 @@ function parseGraphDocument(data: any, repoName?: string) {
     repoName: repoName || 'Connected Repo',
   };
 }
+
+export interface RAGResponse {
+  answer: string;
+  confidence: 'high' | 'medium' | 'low' | string;
+  sources: string[];
+}
+
+export async function askRepoSense(
+  question: string,
+  topK: number = 3,
+): Promise<RAGResponse> {
+  const response = await fetch(`${BACKEND_URL}/rag/chat`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      question,
+      top_k: topK,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+
+    throw new Error(
+      `GraphRAG request failed: ${response.status} ${errorText}`,
+    );
+  }
+
+  return await response.json();
+}
